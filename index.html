@@ -16,54 +16,76 @@ window.onload = main;
 var options = {
   fireEmitPositionSpread: {x:100,y:20},
 
-  fireEmitRate: 500,
+  fireEmitRate: 1600,
   fireEmitRateSlider: {min:1,max:5000},
 
-  fireSize: 20.0,
+  fireSize: 40.0,
   fireSizeSlider: {min:2.0,max:100.0},
 
-  fireSizeVariance: 50.0,
+  fireSizeVariance:  100.0,
   fireSizeVarianceSlider: {min:0.0,max:100.0},
 
-  fireEmitAngleVariance: 0.3,
+  fireEmitAngleVariance: 0.42,
   fireEmitAngleVarianceSlider: {min:0.0,max:Math.PI/2},
 
-  fireSpeed: 150.0,
+  fireSpeed: 200.0,
   fireSpeedSlider: {min:20.0,max:500},
 
-  fireSpeedVariance: 70.0,
+  fireSpeedVariance: 80.0,
   fireSpeedVarianceSlider: {min:0.0,max:100.0},
+
+  fireAlphaDeathSpeed: 0.005,
+  fireAlphaDeathSpeedSlider: {min: 0.002, max: 0.05},
+
+  fireTriangleness: 0.00007,
+  fireTrianglenessSlider: {min:0.0, max:0.0001},
+
 };
 
-textureList = ["rectangle.png","circle.png","gradient.png"];
-texturesLoadedCount = 0;
+textureList = ["rectangle.png","circle.png","gradient.png","explosion.png","smilie.png"];
+images = [];
+textures = [];
+currentTextureIndex = 0;
 
-function loadTexture(textureName) {
-  texture = gl.createTexture();
-  image = new Image();
-  image.onload = function() {handleTextureLoaded(image, texture,textureName);};
-  image.onerror = function() {alert("ERROR: texture " + textureName + " can't be loaded!"); console.error("ERROR: texture " + textureName + " can't be loaded!");};
-  image.src = textureName;
+function loadTexture(textureName,index) {
+  textures[index] = gl.createTexture();
+  images[index] = new Image();
+  images[index].onload = function() {handleTextureLoaded(images[index],index,textureName)};
+  images[index].onerror = function() {alert("ERROR: texture " + textureName + " can't be loaded!"); console.error("ERROR: texture " + textureName + " can't be loaded!");};
+  images[index].src = textureName;
   console.log("starting to load " + textureName);
 }
 
-function handleTextureLoaded(image, texture,textureName) {
+function handleTextureLoaded(image,index,textureName) {
   console.log("loaded texture " + textureName);
-  gl.bindTexture(gl.TEXTURE_2D, texture);
+  gl.bindTexture(gl.TEXTURE_2D, textures[index]);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST);
   gl.generateMipmap(gl.TEXTURE_2D);
   gl.bindTexture(gl.TEXTURE_2D, null);
-  texturesLoadedCount += 1;
-  if (texturesLoadedCount == textureList.length)
-    readyToRun();
+
+  // load the next texture
+  if (index < textureList.length-1)
+    loadTexture("textures/" + textureList[index+1],index+1);
+  //texturesLoadedCount += 1;
+  
 }
 
 function loadAllTextures() {
-  for (var i = 0; i < textureList.length; i++) {
-    loadTexture("textures/" + textureList[i]);
+  var fireTextureCombobox = document.getElementById("fireTexture");
+  fireTextureCombobox.onchange = function() {
+    var image = document.getElementById("fireTextureVal");
+    var newIndex = fireTextureCombobox.selectedIndex;
+    image.src = "textures/" + textureList[newIndex];
+    currentTextureIndex = newIndex;
   }
+  for (var i = 0; i < textureList.length; i++) {
+    fireTextureCombobox.options.add(new Option(textureList[i],i));
+    fireTextureCombobox.selectedIndex = 1;
+  }
+  loadTexture("textures/" + textureList[0],0);
+
 }
 
 fireParticles = [];
@@ -78,12 +100,20 @@ function createFireParticle(emitCenter) {
     size: {width:size,
            height:size},
     color: {r:1.0, g:randomSpread(0.3,0.1), b:0.0, a: 0.5}
-  };
+};
   fireParticles.push(particle);
 }
 
-function addSparkParticle() {
-
+function createSparkParticle() {
+  var size = randomSpread(options.sparkSize,options.sparkSize*(options.sparkSizeVariance/100.0));
+  var particle = {
+    pos: random2DVec(emitCenter,options.fireEmitPositionSpread),
+    speed: randomSpread(options.fireSpeed,options.fireSpeed*options.fireSpeedVariance/100.0),
+    size: {width:size,
+           height:size},
+    color: {r:1.0, g:randomSpread(0.3,0.1), b:0.0, a: 0.5}
+  };
+  fireParticles.push(particle);
 }
 
 var currentlyPressedKeys = {};
@@ -132,6 +162,7 @@ function setupSlider(id,valueId,value,sliderMinMax,step,changeCallback) {
 }
 
 function main() {
+
   // Get A WebGL context
   canvas = document.getElementById("canvas");
   gl = getWebGLContext(canvas);
@@ -139,13 +170,21 @@ function main() {
     return;
   }
 
-  
+  loadAllTextures();
+
+
+  var tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+              new Uint8Array([255, 0, 0, 255])); // red
 
   gl.clearColor(0.0, 0.0, 0.0, 1.0);
 
   vertexBuffer = gl.createBuffer();
   colorBuffer = gl.createBuffer();
   rotationBuffer = gl.createBuffer();
+
+  squareTextureCoordinateVertices = gl.createBuffer();
 
   // setup GLSL program
   vertexShader = createShaderFromScriptElement(gl, "2d-vertex-shader");
@@ -155,11 +194,17 @@ function main() {
 
   // look up where the vertex data needs to go.
   positionAttrib = gl.getAttribLocation(program, "a_position");
+  gl.enableVertexAttribArray(positionAttrib);
   colorAttrib = gl.getAttribLocation(program, "a_color");
+  gl.enableVertexAttribArray(colorAttrib);
+  textureCoordAttribute = gl.getAttribLocation(program, "a_texture_coord");
+  gl.enableVertexAttribArray(textureCoordAttribute);
+  
 
   // lookup uniforms
   resolutionLocation = gl.getUniformLocation(program, "u_resolution");
   cameraLocation = gl.getUniformLocation(program, "cam_position");
+  textureSamplerLocation = gl.getUniformLocation(program, "u_sampler")
 
   // setup UI
   setupSlider("fireEmitRate","fireEmitRateVal",options.fireEmitRate,options.fireEmitRateSlider,1,function(newValue) {options.fireEmitRate = +newValue;});
@@ -168,8 +213,8 @@ function main() {
   setupSlider("fireEmitAngleVariance","fireEmitAngleVarianceVal",options.fireEmitAngleVariance,options.fireEmitAngleVarianceSlider,0.0001,function(newValue) {options.fireEmitAngleVariance = +newValue;});
   setupSlider("fireSpeed","fireSpeedVal",options.fireSpeed,options.fireSpeedSlider,0.01,function(newValue) {options.fireSpeed = +newValue;});
   setupSlider("fireSpeedVariance","fireSpeedVarianceVal",options.fireSpeedVariance,options.fireSpeedVarianceSlider,0.01,function(newValue) {options.fireSpeedVariance = +newValue;});
-
-
+  setupSlider("fireDeathSpeed","fireDeathSpeedVal",options.fireDeathSpeed,options.fireAlphaDeathSpeedSlider,0.000001,function(newValue) {options.fireDeathSpeed = +newValue;});
+  setupSlider("fireTriangleness","fireTrianglenessVal",options.fireTriangleness,options.fireTrianglenessSlider,0.000001,function(newValue) {options.fireTriangleness = +newValue;});
 
 
   document.onkeydown = handleKeyDown;
@@ -180,12 +225,13 @@ function main() {
 
   gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
   gl.enable(gl.BLEND);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); //Prevents s-coordinate wrapping (repeating).
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE); //Prevents t-coordinate wrapping (repeating).
 
-  loadAllTextures();  
-}
 
-function readyToRun() {
   animloop();
+  
 }
 
 function animloop() {
@@ -208,7 +254,6 @@ function timing() {
   }
   lastTime = currentTime;
 }
-
 
 
 function keyCodePressed(charVal) {
@@ -234,12 +279,11 @@ function logic() {
     particleDiscrepancy -= 1.0;
   }
 
-
   // updating particles
   for (var i = 0; i < fireParticles.length; i++) {
     fireParticles[i].pos = addVecs(fireParticles[i].pos,scaleVec(fireParticles[i].dirVec,fireParticles[i].speed*timeDifference/1000.0));
 
-    fireParticles[i].color.a -= 0.01;
+    fireParticles[i].color.a -= options.fireAlphaDeathSpeed+Math.abs((fireParticles[i].pos.x-canvas.width/2)*options.fireTriangleness);
 
     if (fireParticles[i].pos.y <= -fireParticles[i].size.height*2 || fireParticles[i].color.a <= 0)
       markForDeletion(fireParticles,i);
@@ -302,6 +346,8 @@ function render() {
   gl.clear(gl.COLOR_BUFFER_BIT);
     // set the resolution
   gl.uniform2f(resolutionLocation, canvas.width, canvas.height);
+  gl.uniform1i(textureSamplerLocation, 0);
+
   //gl.uniform2f(cameraLocation, cameraLoc.x, cameraLoc.y);
 
   // Create a buffer.
@@ -350,8 +396,10 @@ function concat_inplace(index,arr1,arr2) {
 function drawRects(rects) {
   var index = 0;
   var colorIndex = 0;
+  var texIndex = 0;
   rectArray = [];
   colorArray = [];
+  textureCoordinates = [];
   for (var i = 0; i < rects.length; i++) {
       var x1 = rects[i].pos.x - rects[i].size.width/2;
       var x2 = rects[i].pos.x + rects[i].size.width/2;
@@ -364,6 +412,14 @@ function drawRects(rects) {
          x1, y2,
          x2, y1,
          x2, y2]);
+      texIndex = concat_inplace(texIndex,textureCoordinates,[
+         0.0, 0.0,
+         1.0, 0.0,
+         0.0, 1.0,
+         0.0, 1.0,
+         1.0, 0.0,
+         1.0, 1.0
+      ]);
       for (var ii = 0; ii < 6; ii++) {
         colorIndex = concat_inplace(colorIndex,colorArray,[
             rects[i].color.r,
@@ -374,20 +430,22 @@ function drawRects(rects) {
       }
   }
 
-  //console.log(colorArray);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, textures[currentTextureIndex]);
 
+  gl.bindBuffer(gl.ARRAY_BUFFER, squareTextureCoordinateVertices);
+  gl.vertexAttribPointer(textureCoordAttribute, 2, gl.FLOAT, false, 0, 0);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureCoordinates),
+                gl.STATIC_DRAW);
 
-  //console.log(rects.length + " " + colorArray.length);
-
-  gl.enableVertexAttribArray(positionAttrib);
   gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
   gl.vertexAttribPointer(positionAttrib, 2, gl.FLOAT, false, 0, 0);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(rectArray), gl.STATIC_DRAW);
 
-  gl.enableVertexAttribArray(colorAttrib);
   gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
   gl.vertexAttribPointer(colorAttrib, 4, gl.FLOAT, false, 0, 0);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colorArray), gl.STATIC_DRAW);
+
   gl.drawArrays(gl.TRIANGLES, 0, rects.length*6);
 }
 
@@ -396,7 +454,10 @@ function drawRects(rects) {
 <script id="2d-vertex-shader" type="x-shader/x-vertex">
 attribute vec2 a_position;
 attribute vec4 a_color;
-varying vec4 vColor;
+attribute vec2 a_texture_coord;
+varying vec4 v_color;
+varying vec2 v_texture_coord;
+
 
 uniform vec2 u_resolution;
 
@@ -404,19 +465,31 @@ void main() {
 
   vec2 clipSpace = (a_position/u_resolution)*2.0-1.0;
   gl_Position = vec4(clipSpace * vec2(1, -1), 0, 1);
-  vColor = a_color;
+  v_color = a_color;
+  v_texture_coord = a_texture_coord;
 }
 </script></script>
 <!-- fragment shader -->
 <script id="2d-fragment-shader" type="x-shader/x-fragment">
 precision mediump float;
 
-varying vec4 vColor;
+varying vec4 v_color;
+varying highp vec2 v_texture_coord;
+
+uniform sampler2D u_sampler;
 
 void main() {
    vec2 uv = gl_FragCoord.xy/vec2(800,600); 
-   
-   gl_FragColor = vColor;//vec4(0.0,1.0,0.0,1.0);
+   ;
+   vec4 texColor = texture2D(u_sampler,v_texture_coord.xy);
+
+   vec4 finalColor;
+   finalColor.r = texColor.r*v_color.r;
+   finalColor.g = texColor.g*v_color.g;
+   finalColor.b = texColor.b*v_color.b;
+   finalColor.a = texColor.a*v_color.a;
+
+   gl_FragColor = finalColor;
 }
 </script>
 </head>
@@ -450,9 +523,25 @@ void main() {
           <input id="fireSpeedVariance" class="range" type="range">
           <div id="fireSpeedVarianceVal" class="valueIndicator"></div>%<br>
 
-          <!--<label for="fireTexture">Texture</label>
-          <select id="fireTexture" class="textureComboBox">
-          <img width="64" height="64"></img>-->
+          <label for="fireDeathSpeed">Death Speed</label>
+          <input id="fireDeathSpeed" class="range" type="range"></input>
+          <div id="fireDeathSpeedVal" class="valueIndicator"></div>alpha/second<br>
+
+          <label for="fireTriangleness">Triangleness</label>
+          <input id="fireTriangleness" class="range" type="range"></input>
+          <div id="fireTrianglenessVal" class="valueIndicator"></div><br>
+
+
+          <label for="fireTexture">Texture</label>
+          <select id="fireTexture" class="textureComboBox"></select>
+          <img id="fireTextureVal" width="64" height="64"></img><br><br>
+
+          <label for="fireTextureColor">Enable Texture Color</label>
+          <input id="fireTextureColor" type="checkbox"></input><br>
+
+          <label for="fireTexture">Color</label>
+          <input id="fireTexture" class=""></select>
+          <img id="fireTextureVal" width="64" height="64"></img><br><br>
           <h3>Spark Particles</h3>
         </div>
     </div>

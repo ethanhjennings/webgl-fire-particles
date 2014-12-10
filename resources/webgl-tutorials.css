@@ -23,11 +23,12 @@ canvas {
   right:0;
   margin-left: 620px; 
   height:580px; 
-  background-color:#aaaaaa; 
+  background-color:#333333; 
   padding-left:30px; 
   padding-top:15px;  
   border: 0px solid;
   border-radius: 25px;
+  color:#aaaaaa;
 }
 
 .range {

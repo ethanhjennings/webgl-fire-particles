@@ -29,6 +29,7 @@ canvas {
   border: 0px solid;
   border-radius: 25px;
   color:#aaaaaa;
+  overflow-y: scroll;
 }
 
 .range {

@@ -46,6 +46,10 @@ function randomUnitVec(center,spread) {
   return {x:Math.cos(angle),y:-Math.sin(angle)}
 }
 
+function unitVec(angle) {
+  return {x:Math.cos(angle),y:-Math.sin(angle)};
+}
+
 function clone2DVec(vec) {
   return {x:vec.x,y:vec.y};
 }
@@ -54,6 +58,18 @@ function addVecs(vec1,vec2) {
   return {x:vec1.x+vec2.x,y:vec1.y+vec2.y};
 }
 
+function subVecs(vec1,vec2) {
+  return {x:vec2.x-vec1.x,y:vec2.y-vec1.y};
+}
+
 function scaleVec(vec,scalar) {
   return {x:vec.x*scalar,y:vec.y*scalar};
+}
+
+function vecDir(vec) {
+  return Math.atan2(vec.y,vec.x);
+}
+
+function angleBetweenVecs(vec1,vec2) {
+  return Math.PI - Math.abs(Math.abs(vecDir(vec1) - vecDir(vec2)) - Math.PI); 
 }

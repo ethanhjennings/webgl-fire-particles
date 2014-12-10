@@ -4,16 +4,18 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>Fire/Fireworks Particle Demo (Final Project)</title>
+<title>Fire Particle Demo (Final Project for Graphics)</title>
 <link type="text/css" href="resources/webgl-tutorials.css" rel="stylesheet" />
 <script type="text/javascript" src="resources/webgl-utils.js"></script>
 <script type="text/javascript" src="mathHelper.js"></script>
 <script type="text/javascript" src="otherHelper.js"></script>
+<script type="text/javascript" src="perlin.js"></script>
 <script>
 
 window.onload = main;
 
 var options = {
+  // this option is not actually in the UI
   fireEmitPositionSpread: {x:100,y:20},
 
   fireEmitRate: 1600,
@@ -34,18 +36,55 @@ var options = {
   fireSpeedVariance: 80.0,
   fireSpeedVarianceSlider: {min:0.0,max:100.0},
 
-  fireAlphaDeathSpeed: 0.005,
-  fireAlphaDeathSpeedSlider: {min: 0.002, max: 0.05},
+  fireDeathSpeed: 0.003,
+  fireDeathSpeedSlider: {min: 0.001, max: 0.05},
 
-  fireTriangleness: 0.00007,
-  fireTrianglenessSlider: {min:0.0, max:0.0001},
+  fireTriangleness: 0.00015,
+  fireTrianglenessSlider: {min:0.0, max:0.0003},
+
+  fireTextureHue: 25.0,
+  fireTextureHueSlider: {min:-180,max:180},
+
+  fireTextureHueVariance: 15.0,
+  fireTextureHueVarianceSlider: {min:0.0,max:180},
+
+  fireTextureColorize: true,
+  wind: true,
+  omnidirectionalWind:false,
+
+  windStrength:20.0,
+  windStrengthSlider:{min:0.0,max:60.0},
+
+  windTurbulance:0.0003,
+  windTurbulanceSlider:{min:0.0,max:0.001},
+
+  sparks: true,
+
+  // some of these options for sparks are not actually available in the UI to save UI space
+  sparkEmitRate: 6.0,
+  sparkEmitSlider: {min:0.0,max:10.0},
+
+  sparkSize: 10.0,
+  sparkSizeSlider: {min:5.0,max:100.0},
+
+  sparkSizeVariance: 20.0,
+  sparkSizeVarianceSlider: {min:0.0,max:100.0},
+
+  sparkSpeed: 400.0,
+  sparkSpeedSlider: {min:20.0, max:700.0},
+
+  sparkSpeedVariance: 80.0,
+  sparkSpeedVarianceSlider: {min:0.0, max:100.0},
+
+  sparkDeathSpeed: 0.0085,
+  sparkDeathSpeedSlider: {min: 0.002, max: 0.05},
 
 };
 
-textureList = ["rectangle.png","circle.png","gradient.png","explosion.png","smilie.png"];
+textureList = ["rectangle.png","circle.png","gradient.png","thicker_gradient.png","explosion.png","flame.png","smilie.png","heart.png"];
 images = [];
 textures = [];
-currentTextureIndex = 0;
+currentTextureIndex = 2;
 
 function loadTexture(textureName,index) {
   textures[index] = gl.createTexture();
@@ -82,8 +121,8 @@ function loadAllTextures() {
   }
   for (var i = 0; i < textureList.length; i++) {
     fireTextureCombobox.options.add(new Option(textureList[i],i));
-    fireTextureCombobox.selectedIndex = 1;
   }
+  fireTextureCombobox.selectedIndex = 2;
   loadTexture("textures/" + textureList[0],0);
 
 }
@@ -93,27 +132,38 @@ sparkParticles = [];
 
 function createFireParticle(emitCenter) {
   var size = randomSpread(options.fireSize,options.fireSize*(options.fireSizeVariance/100.0));
+  var speed = randomSpread(options.fireSpeed,options.fireSpeed*options.fireSpeedVariance/100.0);
+  var color = {};
+  if (!options.fireTextureColorize)
+    color = {r:1.0,g:1.0,b:1.0,a:0.5};
+  else {
+    var hue = randomSpread(options.fireTextureHue,options.fireTextureHueVariance);
+    color = HSVtoRGB(convertHue(hue),1.0,1.0);
+    color.a = 0.5;
+  }
   var particle = {
     pos: random2DVec(emitCenter,options.fireEmitPositionSpread),
-    dirVec: randomUnitVec(Math.PI/2,options.fireEmitAngleVariance),
-    speed: randomSpread(options.fireSpeed,options.fireSpeed*options.fireSpeedVariance/100.0),
+    vel: scaleVec(randomUnitVec(Math.PI/2,options.fireEmitAngleVariance),speed),
     size: {width:size,
            height:size},
-    color: {r:1.0, g:randomSpread(0.3,0.1), b:0.0, a: 0.5}
+    color: color,
 };
   fireParticles.push(particle);
 }
 
-function createSparkParticle() {
+function createSparkParticle(emitCenter) {
   var size = randomSpread(options.sparkSize,options.sparkSize*(options.sparkSizeVariance/100.0));
+  var origin = clone2DVec(emitCenter);
+  var speed = randomSpread(options.sparkSpeed,options.sparkSpeed*options.sparkSpeedVariance/100.0);
   var particle = {
+    origin: origin,
     pos: random2DVec(emitCenter,options.fireEmitPositionSpread),
-    speed: randomSpread(options.fireSpeed,options.fireSpeed*options.fireSpeedVariance/100.0),
+    vel: scaleVec(randomUnitVec(Math.PI/2,options.fireEmitAngleVariance*2.0),speed),
     size: {width:size,
            height:size},
-    color: {r:1.0, g:randomSpread(0.3,0.1), b:0.0, a: 0.5}
+    color: {r:1.0, g:0.8, b:0.3, a: 1.0}
   };
-  fireParticles.push(particle);
+  sparkParticles.push(particle);
 }
 
 var currentlyPressedKeys = {};
@@ -149,6 +199,7 @@ function handleMouseUp(event) {
 function setupSlider(id,valueId,value,sliderMinMax,step,changeCallback) {
   var slider = document.getElementById(id);
   var sliderDiv = document.getElementById(valueId);
+  console.log(id + " " + valueId);
   slider.min = sliderMinMax.min;
   slider.max = sliderMinMax.max;
   slider.step = step;
@@ -161,6 +212,7 @@ function setupSlider(id,valueId,value,sliderMinMax,step,changeCallback) {
   slider.oninput();
 }
 
+// initialze the scene
 function main() {
 
   // Get A WebGL context
@@ -182,8 +234,6 @@ function main() {
 
   vertexBuffer = gl.createBuffer();
   colorBuffer = gl.createBuffer();
-  rotationBuffer = gl.createBuffer();
-
   squareTextureCoordinateVertices = gl.createBuffer();
 
   // setup GLSL program
@@ -207,14 +257,40 @@ function main() {
   textureSamplerLocation = gl.getUniformLocation(program, "u_sampler")
 
   // setup UI
+
   setupSlider("fireEmitRate","fireEmitRateVal",options.fireEmitRate,options.fireEmitRateSlider,1,function(newValue) {options.fireEmitRate = +newValue;});
   setupSlider("fireSize","fireSizeVal",options.fireSize,options.fireSizeSlider,1,function(newValue) {options.fireSize = +newValue;});
   setupSlider("fireSizeVariance","fireSizeVarianceVal",options.fireSizeVariance,options.fireSizeVarianceSlider,0.01,function(newValue) {options.fireSizeVariance = +newValue;});
   setupSlider("fireEmitAngleVariance","fireEmitAngleVarianceVal",options.fireEmitAngleVariance,options.fireEmitAngleVarianceSlider,0.0001,function(newValue) {options.fireEmitAngleVariance = +newValue;});
   setupSlider("fireSpeed","fireSpeedVal",options.fireSpeed,options.fireSpeedSlider,0.01,function(newValue) {options.fireSpeed = +newValue;});
   setupSlider("fireSpeedVariance","fireSpeedVarianceVal",options.fireSpeedVariance,options.fireSpeedVarianceSlider,0.01,function(newValue) {options.fireSpeedVariance = +newValue;});
-  setupSlider("fireDeathSpeed","fireDeathSpeedVal",options.fireDeathSpeed,options.fireAlphaDeathSpeedSlider,0.000001,function(newValue) {options.fireDeathSpeed = +newValue;});
+  setupSlider("fireDeathSpeed","fireDeathSpeedVal",options.fireDeathSpeed,options.fireDeathSpeedSlider,0.000001,function(newValue) {options.fireDeathSpeed = +newValue;});
   setupSlider("fireTriangleness","fireTrianglenessVal",options.fireTriangleness,options.fireTrianglenessSlider,0.000001,function(newValue) {options.fireTriangleness = +newValue;});
+
+  setupSlider("fireTextureHue","fireTextureHueVal",options.fireTextureHue,options.fireTextureHueSlider,0.01,function(newValue) {
+      options.fireTextureHue = +newValue;
+      var hue = convertHue(options.fireTextureHue);
+      document.getElementById("fireTextureHueVal").style.backgroundColor = rgbToHex(HSVtoRGB(hue,1.0,1.0));
+  });
+  setupSlider("fireTextureHueVariance","fireTextureHueVarianceVal",options.fireTextureHueVariance,options.fireTextureHueVarianceSlider,0.01,function(newValue) {options.fireTextureHueVariance = +newValue;});
+  document.getElementById("fireTextureColorize").onchange = function() {
+    options.fireTextureColorize = this.checked;
+  };
+
+  document.getElementById("sparks").onchange = function() {
+    options.sparks = this.checked;
+  };
+
+  document.getElementById("wind").onchange = function() {
+    options.wind = this.checked;
+  };
+
+  document.getElementById("omnidirectionalWind").onchange = function() {
+    options.omnidirectionalWind = this.checked;
+  };
+
+  setupSlider("windStrength","windStrengthVal",options.windStrength,options.windStrengthSlider,0.01,function(newValue) {options.windStrength = +newValue;});
+  setupSlider("windTurbulance","windTurbulanceVal",options.windTurbulance,options.windTurbulanceSlider,0.00001,function(newValue) {options.windTurbulance = +newValue;});
 
 
   document.onkeydown = handleKeyDown;
@@ -234,6 +310,7 @@ function main() {
   
 }
 
+// main program loop
 function animloop() {
   requestAnimFrame(animloop);
   timing();
@@ -241,6 +318,7 @@ function animloop() {
   render();
 }
 
+// the timing function's only job is to calculate the framerate
 frameTime = 18;
 lastTime = time();
 lastFPSDivUpdate = time();
@@ -269,27 +347,87 @@ function time() {
 var particleDiscrepancy = 0;
 var lastParticleTime = time();
 
+var sparkParticleDiscrepancy = 0;
+
+noise.seed(Math.random());
+
+// calculate new positions for all the particles
 function logic() {
 
   var currentParticleTime = time();
   var timeDifference = currentParticleTime - lastParticleTime;
+
+  // we don't want to generate a ton of particles if the browser was minimized or something
+  if (timeDifference > 100)
+    timeDifference = 100;
+
+
+  // update fire particles
+
   particleDiscrepancy += options.fireEmitRate*(timeDifference)/1000.0;
   while (particleDiscrepancy > 0) {
     createFireParticle({x:canvas.width/2,y:canvas.height/2+200});
     particleDiscrepancy -= 1.0;
   }
 
-  // updating particles
-  for (var i = 0; i < fireParticles.length; i++) {
-    fireParticles[i].pos = addVecs(fireParticles[i].pos,scaleVec(fireParticles[i].dirVec,fireParticles[i].speed*timeDifference/1000.0));
+  particleAverage = {x:0,y:0};
+  var numParts = fireParticles.length;
+  for (var i = 0; i < numParts; i++) {
+    particleAverage.x += fireParticles[i].pos.x/numParts;
+    particleAverage.y += fireParticles[i].pos.y/numParts;
+  }
 
-    fireParticles[i].color.a -= options.fireAlphaDeathSpeed+Math.abs((fireParticles[i].pos.x-canvas.width/2)*options.fireTriangleness);
+
+  for (var i = 0; i < fireParticles.length; i++) {
+    var x = fireParticles[i].pos.x;
+    var y = fireParticles[i].pos.y;
+
+    // apply wind to the velocity
+    if (options.wind) {
+      if (options.omnidirectionalWind)
+        fireParticles[i].vel = addVecs(fireParticles[i].vel,scaleVec(unitVec((noise.simplex3(x / 500, y / 500, lastParticleTime*options.windTurbulance)+1.0)*Math.PI),options.windStrength));
+      else
+        fireParticles[i].vel = addVecs(fireParticles[i].vel,scaleVec(unitVec((noise.simplex3(x / 500, y / 500, lastParticleTime*options.windTurbulance)+1.0)*Math.PI*0.5),options.windStrength));
+    }
+    // move the particle
+    fireParticles[i].pos = addVecs(fireParticles[i].pos,scaleVec(fireParticles[i].vel,timeDifference/1000.0));
+
+    //var offAngle = angleBetweenVecs(fireParticles[i].vel,subVecs(particleAverage,));
+    //console.log(offAngle);
+  fireParticles[i].color.a -= options.fireDeathSpeed+Math.abs(particleAverage.x-fireParticles[i].pos.x)*options.fireTriangleness;//;Math.abs((fireParticles[i].pos.x-canvas.width/2)*options.fireTriangleness);
 
     if (fireParticles[i].pos.y <= -fireParticles[i].size.height*2 || fireParticles[i].color.a <= 0)
       markForDeletion(fireParticles,i);
   }
   fireParticles = deleteMarked(fireParticles);
-  document.getElementById("numParticles").innerHTML = "# particles: " + fireParticles.length;
+
+  // update spark particles
+  sparkParticleDiscrepancy += options.sparkEmitRate*(timeDifference)/1000.0;
+  while (sparkParticleDiscrepancy > 0) {
+    createSparkParticle({x:canvas.width/2,y:canvas.height/2+200});
+    sparkParticleDiscrepancy -= 1.0;
+  }
+
+  for (var i = 0; i < sparkParticles.length; i++) {
+    /*sparkParticles[i].origin.y -= sparkParticles[i].speed*timeDifference/1000.0;
+    var x = sparkParticles[i].ax*Math.sin(sparkParticles[i].bx*time()*0.00005);
+    var y = sparkParticles[i].ay*Math.sin(sparkParticles[i].by*time()*0.0001);
+    sparkParticles[i].pos = {x:sparkParticles[i].origin.x + x, y: sparkParticles[i].origin.y + y};*/
+
+    var x = sparkParticles[i].pos.x;
+    var y = sparkParticles[i].pos.y;
+    sparkParticles[i].vel = addVecs(sparkParticles[i].vel,scaleVec(unitVec((noise.simplex3(x / 500, y / 500, lastParticleTime*0.0003)+1.0)*Math.PI*0.5),20.0));
+    sparkParticles[i].pos = addVecs(sparkParticles[i].pos,scaleVec(sparkParticles[i].vel,timeDifference/1000.0));
+
+
+    sparkParticles[i].color.a -= options.sparkDeathSpeed;
+
+    if (sparkParticles[i].pos.y <= -sparkParticles[i].size.height*2 || sparkParticles[i].color.a <= 0)
+      markForDeletion(sparkParticles,i);
+  }
+  sparkParticles = deleteMarked(sparkParticles);
+
+  document.getElementById("numParticles").innerHTML = "# particles: " + (fireParticles.length + sparkParticles.length);
 
   lastParticleTime = currentParticleTime;
 
@@ -360,16 +498,9 @@ function render() {
 
 
   drawRects(fireParticles);
-  //drawRects(stars);
-  //drawRects(bullets);
-  /*drawRects([{pos:{x:cameraLoc.x,
-                   y:cameraLoc.y},
-                 width: 50,
-                 height: 50,
-                 
-               }]);*/
-    // Draw the rectangle.
-    
+  if (options.sparks)
+      drawRects(sparkParticles);
+  console.log(particleAverage);
 }
 
 
@@ -393,7 +524,7 @@ function concat_inplace(index,arr1,arr2) {
 }
 
 
-function drawRects(rects) {
+function drawRects(rects,textureIndex) {
   var index = 0;
   var colorIndex = 0;
   var texIndex = 0;
@@ -500,7 +631,7 @@ void main() {
           <h3>Fire Particles</h3>
 
           <label for="fireEmitRate">Emit Rate</label>
-          <input id="fireEmitRate" class="range" type="range">
+          <input id="fireEmitRate" class="range" type="range" style="width:300px;">
           <div id="fireEmitRateVal" class="valueIndicator"></div> particles/second<br>
 
           <label for="fireSize">Particle Size</label>
@@ -525,24 +656,47 @@ void main() {
 
           <label for="fireDeathSpeed">Death Speed</label>
           <input id="fireDeathSpeed" class="range" type="range"></input>
-          <div id="fireDeathSpeedVal" class="valueIndicator"></div>alpha/second<br>
+          <div id="fireDeathSpeedVal" class="valueIndicator"></div> alpha/second<br>
 
           <label for="fireTriangleness">Triangleness</label>
           <input id="fireTriangleness" class="range" type="range"></input>
           <div id="fireTrianglenessVal" class="valueIndicator"></div><br>
 
-
+          <div style="line-height: 64px;">
           <label for="fireTexture">Texture</label>
-          <select id="fireTexture" class="textureComboBox"></select>
-          <img id="fireTextureVal" width="64" height="64"></img><br><br>
+          <select id="fireTexture" class="textureComboBox"></select> 
+          <img style="display:inline-block; vertical-align: middle;" id="fireTextureVal" width="64" height="64" src="textures/gradient.png"></img><br>
+          </div>
 
-          <label for="fireTextureColor">Enable Texture Color</label>
-          <input id="fireTextureColor" type="checkbox"></input><br>
+          <label for="fireTextureColorize">Colorize Texture</label>
+          <input id="fireTextureColorize" type="checkbox" checked></input><br>
 
-          <label for="fireTexture">Color</label>
-          <input id="fireTexture" class=""></select>
-          <img id="fireTextureVal" width="64" height="64"></img><br><br>
-          <h3>Spark Particles</h3>
+          <div style="line-height: 64px;">
+          <label for="fireTextureHue">Hue</label>
+          <input id="fireTextureHue" class="range" type="range"></input>
+          <div id="fireTextureHueVal" style="width:64px; height: 64px; display:inline-block; background-color:white;">4</div><br>
+          </div>
+
+          <label for="fireTextureHueVariance">Hue Variance</label>
+          <input id="fireTextureHueVariance" class="range" type="range"></input>
+          <div id="fireTextureHueVarianceVal" class="valueIndicator"></div>degrees<br>
+
+          <label for="sparks">Enable Sparks</label>
+          <input id="sparks" type="checkbox" checked></input><br>
+
+          <label for="wind">Enable Wind</label>
+          <input id="wind" type="checkbox" checked></input><br><br>
+
+          <label for="omnidirectionalWind">Enable Omnidirectional Wind</label>
+          <input id="omnidirectionalWind" type="checkbox"></input><br><br>
+
+          <label for="windTurbulance">Wind Turbulance</label>
+          <input id="windTurbulance" class="range" type="range"></input>
+          <div id="windTurbulanceVal" class="valueIndicator"></div><br><br>
+
+          <label for="windStrength">Wind Strength</label>
+          <input id="windStrength" class="range" type="range"></input>
+          <div id="windStrengthVal" class="valueIndicator"></div><br>
         </div>
     </div>
 

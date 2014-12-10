@@ -1,0 +1,467 @@
+
+<!-- Licensed under a BSD license. See license.html for license -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Fire/Fireworks Particle Demo (Final Project)</title>
+<link type="text/css" href="resources/webgl-tutorials.css" rel="stylesheet" />
+<script type="text/javascript" src="resources/webgl-utils.js"></script>
+<script type="text/javascript" src="mathHelper.js"></script>
+<script type="text/javascript" src="otherHelper.js"></script>
+<script>
+
+window.onload = main;
+
+var options = {
+  fireEmitPositionSpread: {x:100,y:20},
+
+  fireEmitRate: 500,
+  fireEmitRateSlider: {min:1,max:5000},
+
+  fireSize: 20.0,
+  fireSizeSlider: {min:2.0,max:100.0},
+
+  fireSizeVariance: 50.0,
+  fireSizeVarianceSlider: {min:0.0,max:100.0},
+
+  fireEmitAngleVariance: 0.3,
+  fireEmitAngleVarianceSlider: {min:0.0,max:Math.PI/2},
+
+  fireSpeed: 150.0,
+  fireSpeedSlider: {min:20.0,max:500},
+
+  fireSpeedVariance: 70.0,
+  fireSpeedVarianceSlider: {min:0.0,max:100.0},
+};
+
+textureList = ["rectangle.png","circle.png","gradient.png"];
+texturesLoadedCount = 0;
+
+function loadTexture(textureName) {
+  texture = gl.createTexture();
+  image = new Image();
+  image.onload = function() {handleTextureLoaded(image, texture,textureName);};
+  image.onerror = function() {alert("ERROR: texture " + textureName + " can't be loaded!"); console.error("ERROR: texture " + textureName + " can't be loaded!");};
+  image.src = textureName;
+  console.log("starting to load " + textureName);
+}
+
+function handleTextureLoaded(image, texture,textureName) {
+  console.log("loaded texture " + textureName);
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST);
+  gl.generateMipmap(gl.TEXTURE_2D);
+  gl.bindTexture(gl.TEXTURE_2D, null);
+  texturesLoadedCount += 1;
+  if (texturesLoadedCount == textureList.length)
+    readyToRun();
+}
+
+function loadAllTextures() {
+  for (var i = 0; i < textureList.length; i++) {
+    loadTexture("textures/" + textureList[i]);
+  }
+}
+
+fireParticles = [];
+sparkParticles = [];
+
+function createFireParticle(emitCenter) {
+  var size = randomSpread(options.fireSize,options.fireSize*(options.fireSizeVariance/100.0));
+  var particle = {
+    pos: random2DVec(emitCenter,options.fireEmitPositionSpread),
+    dirVec: randomUnitVec(Math.PI/2,options.fireEmitAngleVariance),
+    speed: randomSpread(options.fireSpeed,options.fireSpeed*options.fireSpeedVariance/100.0),
+    size: {width:size,
+           height:size},
+    color: {r:1.0, g:randomSpread(0.3,0.1), b:0.0, a: 0.5}
+  };
+  fireParticles.push(particle);
+}
+
+function addSparkParticle() {
+
+}
+
+var currentlyPressedKeys = {};
+mouseDown = false;
+mousePos = {};
+
+function handleKeyDown(event) {
+  currentlyPressedKeys[event.keyCode] = true;
+}
+
+function handleKeyUp(event) {
+  currentlyPressedKeys[event.keyCode] = false;
+}
+
+function canvasCoordinates(canvas,pos) {
+  var rect = canvas.getBoundingClientRect();
+  return {x:pos.x-rect.left,y:pos.y-rect.top};
+}
+
+function handleMouseDown(event) {
+ mouseDown = true;
+ mousePos = canvasCoordinates(canvas,{x:event.clientX,y:event.clientY});
+}
+
+function handleMouseMove(event) {
+ mousePos = canvasCoordinates(canvas,{x:event.clientX,y:event.clientY});
+}
+
+function handleMouseUp(event) {
+ mouseDown = false;
+}
+
+function setupSlider(id,valueId,value,sliderMinMax,step,changeCallback) {
+  var slider = document.getElementById(id);
+  var sliderDiv = document.getElementById(valueId);
+  slider.min = sliderMinMax.min;
+  slider.max = sliderMinMax.max;
+  slider.step = step;
+  slider.value = value;
+  slider.oninput = function() {
+    newValue = this.value;
+    sliderDiv.innerHTML = newValue;
+    changeCallback(newValue);
+  };
+  slider.oninput();
+}
+
+function main() {
+  // Get A WebGL context
+  canvas = document.getElementById("canvas");
+  gl = getWebGLContext(canvas);
+  if (!gl) {
+    return;
+  }
+
+  
+
+  gl.clearColor(0.0, 0.0, 0.0, 1.0);
+
+  vertexBuffer = gl.createBuffer();
+  colorBuffer = gl.createBuffer();
+  rotationBuffer = gl.createBuffer();
+
+  // setup GLSL program
+  vertexShader = createShaderFromScriptElement(gl, "2d-vertex-shader");
+  fragmentShader = createShaderFromScriptElement(gl, "2d-fragment-shader");
+  program = createProgram(gl, [vertexShader, fragmentShader]);
+  gl.useProgram(program);
+
+  // look up where the vertex data needs to go.
+  positionAttrib = gl.getAttribLocation(program, "a_position");
+  colorAttrib = gl.getAttribLocation(program, "a_color");
+
+  // lookup uniforms
+  resolutionLocation = gl.getUniformLocation(program, "u_resolution");
+  cameraLocation = gl.getUniformLocation(program, "cam_position");
+
+  // setup UI
+  setupSlider("fireEmitRate","fireEmitRateVal",options.fireEmitRate,options.fireEmitRateSlider,1,function(newValue) {options.fireEmitRate = +newValue;});
+  setupSlider("fireSize","fireSizeVal",options.fireSize,options.fireSizeSlider,1,function(newValue) {options.fireSize = +newValue;});
+  setupSlider("fireSizeVariance","fireSizeVarianceVal",options.fireSizeVariance,options.fireSizeVarianceSlider,0.01,function(newValue) {options.fireSizeVariance = +newValue;});
+  setupSlider("fireEmitAngleVariance","fireEmitAngleVarianceVal",options.fireEmitAngleVariance,options.fireEmitAngleVarianceSlider,0.0001,function(newValue) {options.fireEmitAngleVariance = +newValue;});
+  setupSlider("fireSpeed","fireSpeedVal",options.fireSpeed,options.fireSpeedSlider,0.01,function(newValue) {options.fireSpeed = +newValue;});
+  setupSlider("fireSpeedVariance","fireSpeedVarianceVal",options.fireSpeedVariance,options.fireSpeedVarianceSlider,0.01,function(newValue) {options.fireSpeedVariance = +newValue;});
+
+
+
+
+  document.onkeydown = handleKeyDown;
+  document.onkeyup = handleKeyUp;
+  canvas.onmousedown = handleMouseDown;
+  document.onmouseup = handleMouseUp;
+  document.onmousemove = handleMouseMove;
+
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+  gl.enable(gl.BLEND);
+
+  loadAllTextures();  
+}
+
+function readyToRun() {
+  animloop();
+}
+
+function animloop() {
+  requestAnimFrame(animloop);
+  timing();
+  logic();
+  render();
+}
+
+frameTime = 18;
+lastTime = time();
+lastFPSDivUpdate = time();
+function timing() {
+  currentTime = time();
+  frameTime = frameTime * 0.9 + (currentTime - lastTime) * 0.1;
+  fps = 1000.0/frameTime;
+  if (currentTime - lastFPSDivUpdate > 100) {
+    document.getElementById("fps").innerHTML = "FPS: " + Math.round(fps);
+    lastFPSDivUpdate = currentTime;
+  }
+  lastTime = currentTime;
+}
+
+
+
+function keyCodePressed(charVal) {
+  return currentlyPressedKeys[charVal.charCodeAt(0)];
+}
+
+function time() {
+  var d = new Date();
+  var n = d.getTime();
+  return n;
+}
+
+var particleDiscrepancy = 0;
+var lastParticleTime = time();
+
+function logic() {
+
+  var currentParticleTime = time();
+  var timeDifference = currentParticleTime - lastParticleTime;
+  particleDiscrepancy += options.fireEmitRate*(timeDifference)/1000.0;
+  while (particleDiscrepancy > 0) {
+    createFireParticle({x:canvas.width/2,y:canvas.height/2+200});
+    particleDiscrepancy -= 1.0;
+  }
+
+
+  // updating particles
+  for (var i = 0; i < fireParticles.length; i++) {
+    fireParticles[i].pos = addVecs(fireParticles[i].pos,scaleVec(fireParticles[i].dirVec,fireParticles[i].speed*timeDifference/1000.0));
+
+    fireParticles[i].color.a -= 0.01;
+
+    if (fireParticles[i].pos.y <= -fireParticles[i].size.height*2 || fireParticles[i].color.a <= 0)
+      markForDeletion(fireParticles,i);
+  }
+  fireParticles = deleteMarked(fireParticles);
+  document.getElementById("numParticles").innerHTML = "# particles: " + fireParticles.length;
+
+  lastParticleTime = currentParticleTime;
+
+
+  /*ACCEL = 0.5;
+  if (keyCodePressed('W'))
+    cameraVel.y-=ACCEL;
+  if (keyCodePressed('S'))
+    cameraVel.y+=ACCEL;
+  if (keyCodePressed('A'))
+    cameraVel.x-=ACCEL;
+  if (keyCodePressed('D'))
+    cameraVel.x+=ACCEL;
+
+  if (mouseDown) {
+    if (time() - bulletLastTime > 300) {
+      deltaX = mousePos.x-canvas.width/2;
+      deltaY = mousePos.y-canvas.height/2;
+      vec = normalize({x:deltaX,y:deltaY});
+      vec.x *= BULLET_SPEED;
+      vec.y *= BULLET_SPEED;
+      bulletLastTime = time();
+
+      bullets.push({
+        vel:vec,
+        pos:{
+          x:cameraLoc.x,
+          y:cameraLoc.y
+        },
+        width:40,
+        height:40,
+        color:{r:1.0,g:1.0,b:0.0}
+      });
+    }
+  }
+
+  for (var i = 0; i < bullets.length; i++) {
+    bullets[i].pos.x += bullets[i].vel.x;
+    bullets[i].pos.y += bullets[i].vel.y;
+  }
+
+  cameraVel.x += -1.0*Math.sign(cameraVel.x)*0.1;
+  cameraVel.y += -1.0*Math.sign(cameraVel.y)*0.1;
+
+  cameraVel.x = clamp(cameraVel.x,-15.0,15.0);
+  cameraVel.y = clamp(cameraVel.y,-15.0,15.0);
+
+  cameraLoc.x += cameraVel.x;
+  cameraLoc.y += cameraVel.y;*/
+}
+
+function render() {
+
+  gl.clear(gl.COLOR_BUFFER_BIT);
+    // set the resolution
+  gl.uniform2f(resolutionLocation, canvas.width, canvas.height);
+  //gl.uniform2f(cameraLocation, cameraLoc.x, cameraLoc.y);
+
+  // Create a buffer.
+  //gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+
+  /*index = 0;
+  index = concat_inplace(index,rects,stars);
+  index = concat_inplace(index,rects,enemies);
+  index = concat_inplace(index,rects,bullets);*/
+
+
+  drawRects(fireParticles);
+  //drawRects(stars);
+  //drawRects(bullets);
+  /*drawRects([{pos:{x:cameraLoc.x,
+                   y:cameraLoc.y},
+                 width: 50,
+                 height: 50,
+                 
+               }]);*/
+    // Draw the rectangle.
+    
+}
+
+
+rectArray = [];
+colorArray = [];
+rects = [];
+
+
+/*for (var i = 0; i < 30000; i++) {
+  rectArray.push(0);
+  colorArray.push(0);
+  rects.push(0);
+}*/
+
+function concat_inplace(index,arr1,arr2) {
+  for (var i = 0; i < arr2.length; i++) {
+    arr1[index] = arr2[i];
+    index += 1;
+  }
+  return index;
+}
+
+
+function drawRects(rects) {
+  var index = 0;
+  var colorIndex = 0;
+  rectArray = [];
+  colorArray = [];
+  for (var i = 0; i < rects.length; i++) {
+      var x1 = rects[i].pos.x - rects[i].size.width/2;
+      var x2 = rects[i].pos.x + rects[i].size.width/2;
+      var y1 = rects[i].pos.y - rects[i].size.height/2;
+      var y2 = rects[i].pos.y + rects[i].size.height/2;
+      index = concat_inplace(index,rectArray,[
+         x1, y1,
+         x2, y1,
+         x1, y2,
+         x1, y2,
+         x2, y1,
+         x2, y2]);
+      for (var ii = 0; ii < 6; ii++) {
+        colorIndex = concat_inplace(colorIndex,colorArray,[
+            rects[i].color.r,
+            rects[i].color.g,
+            rects[i].color.b,
+            rects[i].color.a
+          ]);
+      }
+  }
+
+  //console.log(colorArray);
+
+
+  //console.log(rects.length + " " + colorArray.length);
+
+  gl.enableVertexAttribArray(positionAttrib);
+  gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+  gl.vertexAttribPointer(positionAttrib, 2, gl.FLOAT, false, 0, 0);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(rectArray), gl.STATIC_DRAW);
+
+  gl.enableVertexAttribArray(colorAttrib);
+  gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+  gl.vertexAttribPointer(colorAttrib, 4, gl.FLOAT, false, 0, 0);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colorArray), gl.STATIC_DRAW);
+  gl.drawArrays(gl.TRIANGLES, 0, rects.length*6);
+}
+
+</script>
+<!-- vertex shader -->
+<script id="2d-vertex-shader" type="x-shader/x-vertex">
+attribute vec2 a_position;
+attribute vec4 a_color;
+varying vec4 vColor;
+
+uniform vec2 u_resolution;
+
+void main() {
+
+  vec2 clipSpace = (a_position/u_resolution)*2.0-1.0;
+  gl_Position = vec4(clipSpace * vec2(1, -1), 0, 1);
+  vColor = a_color;
+}
+</script></script>
+<!-- fragment shader -->
+<script id="2d-fragment-shader" type="x-shader/x-fragment">
+precision mediump float;
+
+varying vec4 vColor;
+
+void main() {
+   vec2 uv = gl_FragCoord.xy/vec2(800,600); 
+   
+   gl_FragColor = vColor;//vec4(0.0,1.0,0.0,1.0);
+}
+</script>
+</head>
+<body>
+    <div class="containerDiv">
+        <div class="leftPanel"> <canvas id="canvas" width="600" height="600"></canvas> </div>
+        <div class="rightPanel">
+          <h3>Fire Particles</h3>
+
+          <label for="fireEmitRate">Emit Rate</label>
+          <input id="fireEmitRate" class="range" type="range">
+          <div id="fireEmitRateVal" class="valueIndicator"></div> particles/second<br>
+
+          <label for="fireSize">Particle Size</label>
+          <input id="fireSize" class="range" type="range">
+          <div id="fireSizeVal" class="valueIndicator"></div> pixels<br>
+
+          <label for="fireSizeVariance">Particle Size Variance</label>
+          <input id="fireSizeVariance" class="range" type="range">
+          <div id="fireSizeVarianceVal" class="valueIndicator"></div>%<br>
+
+          <label for="fireEmitAngleVariance">Emit Angle Variance</label>
+          <input id="fireEmitAngleVariance" class="range" type="range">
+          <div id="fireEmitAngleVarianceVal" class="valueIndicator"></div> radians<br>
+
+          <label for="fireSpeed">Speed</label>
+          <input id="fireSpeed" class="range" type="range">
+          <div id="fireSpeedVal" class="valueIndicator"></div> pixels/second<br>
+
+          <label for="fireSpeedVariance">Speed Variance</label>
+          <input id="fireSpeedVariance" class="range" type="range">
+          <div id="fireSpeedVarianceVal" class="valueIndicator"></div>%<br>
+
+          <!--<label for="fireTexture">Texture</label>
+          <select id="fireTexture" class="textureComboBox">
+          <img width="64" height="64"></img>-->
+          <h3>Spark Particles</h3>
+        </div>
+    </div>
+
+
+<div class="footer">
+<div id="fps"></div><div id="numParticles"></div>
+</div>
+</body>
+</html>
+
+

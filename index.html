@@ -4,6 +4,7 @@
 <html>
 <head>
 <meta charset="utf-8">
+<meta property="og:image" content="screenshots/fire.png"/>
 <title>Fire Particle Demo (Final Project for Graphics)</title>
 <link type="text/css" href="resources/webgl-tutorials.css" rel="stylesheet" />
 <script type="text/javascript" src="resources/webgl-utils.js"></script>
@@ -409,10 +410,6 @@ function logic() {
   }
 
   for (var i = 0; i < sparkParticles.length; i++) {
-    /*sparkParticles[i].origin.y -= sparkParticles[i].speed*timeDifference/1000.0;
-    var x = sparkParticles[i].ax*Math.sin(sparkParticles[i].bx*time()*0.00005);
-    var y = sparkParticles[i].ay*Math.sin(sparkParticles[i].by*time()*0.0001);
-    sparkParticles[i].pos = {x:sparkParticles[i].origin.x + x, y: sparkParticles[i].origin.y + y};*/
 
     var x = sparkParticles[i].pos.x;
     var y = sparkParticles[i].pos.y;
@@ -431,52 +428,6 @@ function logic() {
 
   lastParticleTime = currentParticleTime;
 
-
-  /*ACCEL = 0.5;
-  if (keyCodePressed('W'))
-    cameraVel.y-=ACCEL;
-  if (keyCodePressed('S'))
-    cameraVel.y+=ACCEL;
-  if (keyCodePressed('A'))
-    cameraVel.x-=ACCEL;
-  if (keyCodePressed('D'))
-    cameraVel.x+=ACCEL;
-
-  if (mouseDown) {
-    if (time() - bulletLastTime > 300) {
-      deltaX = mousePos.x-canvas.width/2;
-      deltaY = mousePos.y-canvas.height/2;
-      vec = normalize({x:deltaX,y:deltaY});
-      vec.x *= BULLET_SPEED;
-      vec.y *= BULLET_SPEED;
-      bulletLastTime = time();
-
-      bullets.push({
-        vel:vec,
-        pos:{
-          x:cameraLoc.x,
-          y:cameraLoc.y
-        },
-        width:40,
-        height:40,
-        color:{r:1.0,g:1.0,b:0.0}
-      });
-    }
-  }
-
-  for (var i = 0; i < bullets.length; i++) {
-    bullets[i].pos.x += bullets[i].vel.x;
-    bullets[i].pos.y += bullets[i].vel.y;
-  }
-
-  cameraVel.x += -1.0*Math.sign(cameraVel.x)*0.1;
-  cameraVel.y += -1.0*Math.sign(cameraVel.y)*0.1;
-
-  cameraVel.x = clamp(cameraVel.x,-15.0,15.0);
-  cameraVel.y = clamp(cameraVel.y,-15.0,15.0);
-
-  cameraLoc.x += cameraVel.x;
-  cameraLoc.y += cameraVel.y;*/
 }
 
 function render() {
@@ -485,17 +436,6 @@ function render() {
     // set the resolution
   gl.uniform2f(resolutionLocation, canvas.width, canvas.height);
   gl.uniform1i(textureSamplerLocation, 0);
-
-  //gl.uniform2f(cameraLocation, cameraLoc.x, cameraLoc.y);
-
-  // Create a buffer.
-  //gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
-
-  /*index = 0;
-  index = concat_inplace(index,rects,stars);
-  index = concat_inplace(index,rects,enemies);
-  index = concat_inplace(index,rects,bullets);*/
-
 
   drawRects(fireParticles);
   if (options.sparks)
@@ -508,12 +448,6 @@ rectArray = [];
 colorArray = [];
 rects = [];
 
-
-/*for (var i = 0; i < 30000; i++) {
-  rectArray.push(0);
-  colorArray.push(0);
-  rects.push(0);
-}*/
 
 function concat_inplace(index,arr1,arr2) {
   for (var i = 0; i < arr2.length; i++) {

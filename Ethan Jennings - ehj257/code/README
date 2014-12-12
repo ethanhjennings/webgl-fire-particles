@@ -1,4 +1,0 @@
-To run:
-	You will need to host this folder on your local machine and connect to it with chrome. You can use node.js's http-server for example. (not tested in any other browser than chrome)
-
-Some of the code is taken from other sources, please see my report.

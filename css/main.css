@@ -1,5 +1,3 @@
-/* Licensed under a BSD license. See ../license.html for license */
-
 html, body {
   background-color: #fff;
   font-family: Sans-Serif;
@@ -22,6 +20,7 @@ canvas {
 .rightPanel {
   right:0;
   margin-left: 620px; 
+  margin-right: 20px; 
   height:580px; 
   background-color:#333333; 
   padding-left:30px; 
@@ -29,7 +28,7 @@ canvas {
   border: 0px solid;
   border-radius: 25px;
   color:#aaaaaa;
-  overflow-y: scroll;
+  overflow-y: auto;
 }
 
 .range {
@@ -79,32 +78,4 @@ label {
 .gman-slider-slider {
   font-size: x-small;
   gbackground-color: red;
-}
-
-/* styles to apply if in an iframe */
-
-body.iframe {
-  width: 100%;
-  height: 100%;
-  margin: 0px;
-  padding: 0px;
-  overflow: hidden;
-}
-
-.iframe>.description {
-  display: none;
-}
-
-.iframe>canvas {
-  width: 100%;
-  height: 100%;
-}
-
-.iframe canvas {
-  border: none;
-}
-
-.iframe>#example {
-  width: 100%;
-  height: 100%;
 }

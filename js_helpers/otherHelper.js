@@ -13,7 +13,6 @@ function deleteMarked(array) {
   return array.slice(0,newIndex);
 }
 
-
 // hsv to rgb
 function HSVtoRGB(h, s, v) {
     var r, g, b, i, f, p, q, t;

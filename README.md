@@ -1,4 +1,4 @@
-A WebGL particle system for fire effects.
+A demo of a WebGL particle system for fire effects.
 
 [View demo here!](https://ethanhjennings.github.io/webgl-fire-particles)
 

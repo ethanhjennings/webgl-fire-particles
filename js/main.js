@@ -1,5 +1,5 @@
 var options = {
-  // some of these options for sparks are not actually available in the UI to save UI space
+  // some of these options are not actually available in the UI to save visual space
   fireEmitPositionSpread: {x:100,y:20},
 
   fireEmitRate: 1600,
@@ -90,7 +90,6 @@ function handleTextureLoaded(image,index,textureName) {
   // load the next texture
   if (index < textureList.length-1)
     loadTexture("textures/" + textureList[index+1],index+1);
-  //texturesLoadedCount += 1;
   
 }
 
@@ -179,7 +178,7 @@ function handleMouseUp(event) {
  mouseDown = false;
 }
 
-function setupSlider(id,valueId,value,sliderMinMax,step,changeCallback) {
+function setupSlider(id, valueId, value, sliderMinMax, step, changeCallback) {
   var slider = document.getElementById(id);
   var sliderDiv = document.getElementById(valueId);
   console.log(id + " " + valueId);
@@ -233,8 +232,7 @@ async function main() {
 
   loadAllTextures();
 
-
-  var tex = gl.createTexture();
+  const tex = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, tex);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
               new Uint8Array([255, 0, 0, 255])); // red
@@ -246,10 +244,10 @@ async function main() {
   squareTextureCoordinateVertices = gl.createBuffer();
 
   // setup GLSL program
-  vertexShader = await loadShader(gl, "js/vertex-shader.js", gl.VERTEX_SHADER);
-  fragmentShader = await loadShader(gl, "js/fragment-shader.js", gl.FRAGMENT_SHADER);
+  const vertexShader = await loadShader(gl, "js/vertex-shader.js", gl.VERTEX_SHADER);
+  const fragmentShader = await loadShader(gl, "js/fragment-shader.js", gl.FRAGMENT_SHADER);
 
-  program = createProgram(gl, [vertexShader, fragmentShader]);
+  const program = createProgram(gl, [vertexShader, fragmentShader]);
   gl.useProgram(program);
 
   // look up where the vertex data needs to go.
@@ -260,47 +258,69 @@ async function main() {
   textureCoordAttribute = gl.getAttribLocation(program, "a_texture_coord");
   gl.enableVertexAttribArray(textureCoordAttribute);
   
-
   // lookup uniforms
   resolutionLocation = gl.getUniformLocation(program, "u_resolution");
-  cameraLocation = gl.getUniformLocation(program, "cam_position");
   textureSamplerLocation = gl.getUniformLocation(program, "u_sampler")
 
   // setup UI
+  setupSlider("fireEmitRate", "fireEmitRateVal", options.fireEmitRate, options.fireEmitRateSlider, 1,
+    (newValue) => {options.fireEmitRate = +newValue;}
+  );
+  setupSlider("fireSize", "fireSizeVal", options.fireSize, options.fireSizeSlider, 1,
+    (newValue) => {options.fireSize = +newValue;}
+  );
+  setupSlider("fireSizeVariance", "fireSizeVarianceVal", options.fireSizeVariance, options.fireSizeVarianceSlider, 0.01,
+    (newValue) => {options.fireSizeVariance = +newValue;}
+  );
+  setupSlider("fireEmitAngleVariance", "fireEmitAngleVarianceVal", options.fireEmitAngleVariance, options.fireEmitAngleVarianceSlider, 0.0001,
+    (newValue) => {options.fireEmitAngleVariance = +newValue;}
+  );
+  setupSlider("fireSpeed", "fireSpeedVal", options.fireSpeed, options.fireSpeedSlider, 0.01,
+    (newValue) => {options.fireSpeed = +newValue;}
+  );
+  setupSlider("fireSpeedVariance", "fireSpeedVarianceVal", options.fireSpeedVariance, options.fireSpeedVarianceSlider, 0.01,
+    (newValue) => {options.fireSpeedVariance = +newValue;}
+  );
+  setupSlider("fireDeathSpeed", "fireDeathSpeedVal", options.fireDeathSpeed, options.fireDeathSpeedSlider, 0.000001,
+    (newValue) => {options.fireDeathSpeed = +newValue;}
+  );
+  setupSlider("fireTriangleness", "fireTrianglenessVal", options.fireTriangleness, options.fireTrianglenessSlider, 0.000001,
+    (newValue) => {options.fireTriangleness = +newValue;}
+  );
 
-  setupSlider("fireEmitRate","fireEmitRateVal",options.fireEmitRate,options.fireEmitRateSlider,1,function(newValue) {options.fireEmitRate = +newValue;});
-  setupSlider("fireSize","fireSizeVal",options.fireSize,options.fireSizeSlider,1,function(newValue) {options.fireSize = +newValue;});
-  setupSlider("fireSizeVariance","fireSizeVarianceVal",options.fireSizeVariance,options.fireSizeVarianceSlider,0.01,function(newValue) {options.fireSizeVariance = +newValue;});
-  setupSlider("fireEmitAngleVariance","fireEmitAngleVarianceVal",options.fireEmitAngleVariance,options.fireEmitAngleVarianceSlider,0.0001,function(newValue) {options.fireEmitAngleVariance = +newValue;});
-  setupSlider("fireSpeed","fireSpeedVal",options.fireSpeed,options.fireSpeedSlider,0.01,function(newValue) {options.fireSpeed = +newValue;});
-  setupSlider("fireSpeedVariance","fireSpeedVarianceVal",options.fireSpeedVariance,options.fireSpeedVarianceSlider,0.01,function(newValue) {options.fireSpeedVariance = +newValue;});
-  setupSlider("fireDeathSpeed","fireDeathSpeedVal",options.fireDeathSpeed,options.fireDeathSpeedSlider,0.000001,function(newValue) {options.fireDeathSpeed = +newValue;});
-  setupSlider("fireTriangleness","fireTrianglenessVal",options.fireTriangleness,options.fireTrianglenessSlider,0.000001,function(newValue) {options.fireTriangleness = +newValue;});
-
-  setupSlider("fireTextureHue","fireTextureHueVal",options.fireTextureHue,options.fireTextureHueSlider,0.01,function(newValue) {
+  setupSlider("fireTextureHue", "fireTextureHueVal", options.fireTextureHue, options.fireTextureHueSlider, 0.01,
+    (newValue) => {
       options.fireTextureHue = +newValue;
       var hue = convertHue(options.fireTextureHue);
-      document.getElementById("fireTextureHueVal").style.backgroundColor = rgbToHex(HSVtoRGB(hue,1.0,1.0));
-  });
-  setupSlider("fireTextureHueVariance","fireTextureHueVarianceVal",options.fireTextureHueVariance,options.fireTextureHueVarianceSlider,0.01,function(newValue) {options.fireTextureHueVariance = +newValue;});
-  document.getElementById("fireTextureColorize").onchange = function() {
+      document.getElementById("fireTextureHueVal").style.backgroundColor = rgbToHex(HSVtoRGB(hue, 1.0, 1.0));
+    }
+  );
+  setupSlider("fireTextureHueVariance", "fireTextureHueVarianceVal", options.fireTextureHueVariance, options.fireTextureHueVarianceSlider, 0.01,
+    (newValue) => {options.fireTextureHueVariance = +newValue;}
+   );
+
+  setupSlider("windStrength", "windStrengthVal", options.windStrength, options.windStrengthSlider, 0.01,
+    (newValue) => {options.windStrength = +newValue;}
+  );
+  setupSlider("windTurbulance", "windTurbulanceVal", options.windTurbulance, options.windTurbulanceSlider, 0.00001,
+    (newValue) => {options.windTurbulance = +newValue;}
+  );
+
+  document.getElementById("fireTextureColorize").onchange = () => {
     options.fireTextureColorize = this.checked;
   };
 
-  document.getElementById("sparks").onchange = function() {
+  document.getElementById("sparks").onchange = () => {
     options.sparks = this.checked;
   };
 
-  document.getElementById("wind").onchange = function() {
+  document.getElementById("wind").onchange = () => {
     options.wind = this.checked;
   };
 
-  document.getElementById("omnidirectionalWind").onchange = function() {
+  document.getElementById("omnidirectionalWind").onchange = () => {
     options.omnidirectionalWind = this.checked;
   };
-
-  setupSlider("windStrength","windStrengthVal",options.windStrength,options.windStrengthSlider,0.01,function(newValue) {options.windStrength = +newValue;});
-  setupSlider("windTurbulance","windTurbulanceVal",options.windTurbulance,options.windTurbulanceSlider,0.00001,function(newValue) {options.windTurbulance = +newValue;});
 
 
   document.onkeydown = handleKeyDown;
@@ -311,10 +331,6 @@ async function main() {
 
   gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
   gl.enable(gl.BLEND);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); //Prevents s-coordinate wrapping (repeating).
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE); //Prevents t-coordinate wrapping (repeating).
-
 
   animloop();
   
@@ -371,7 +387,6 @@ function logic() {
   if (timeDifference > 100)
     timeDifference = 100;
 
-
   // update fire particles
 
   particleDiscrepancy += options.fireEmitRate*(timeDifference)/1000.0;
@@ -402,8 +417,6 @@ function logic() {
     // move the particle
     fireParticles[i].pos = addVecs(fireParticles[i].pos,scaleVec(fireParticles[i].vel,timeDifference/1000.0));
 
-    //var offAngle = angleBetweenVecs(fireParticles[i].vel,subVecs(particleAverage,));
-    //console.log(offAngle);
   fireParticles[i].color.a -= options.fireDeathSpeed+Math.abs(particleAverage.x-fireParticles[i].pos.x)*options.fireTriangleness;//;Math.abs((fireParticles[i].pos.x-canvas.width/2)*options.fireTriangleness);
 
     if (fireParticles[i].pos.y <= -fireParticles[i].size.height*2 || fireParticles[i].color.a <= 0)
@@ -424,7 +437,6 @@ function logic() {
     var y = sparkParticles[i].pos.y;
     sparkParticles[i].vel = addVecs(sparkParticles[i].vel,scaleVec(unitVec((noise.simplex3(x / 500, y / 500, lastParticleTime*0.0003)+1.0)*Math.PI*0.5),20.0));
     sparkParticles[i].pos = addVecs(sparkParticles[i].pos,scaleVec(sparkParticles[i].vel,timeDifference/1000.0));
-
 
     sparkParticles[i].color.a -= options.sparkDeathSpeed;
 
